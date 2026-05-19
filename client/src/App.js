@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Navbar from './components/Navbar';
 import ItemList from './components/ItemList';
 import AddItem from './components/AddItem';
+import Register from './components/Register';
+import Login from './components/Login';
 import api from './services/api';
 
 function App() {
@@ -11,6 +13,7 @@ function App() {
   const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
+  const [currentPage, setCurrentPage] = useState('home');
 
   // Check if user is logged in on mount
   useEffect(() => {
@@ -18,8 +21,6 @@ function App() {
     if (token) {
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       fetchUser();
-    } else {
-      setLoading(false);
     }
     fetchItems();
   }, []);
@@ -41,7 +42,7 @@ function App() {
   const fetchItems = async () => {
     try {
       const response = await api.get('/items');
-      setItems(response.data.data);
+      setItems(response.data.data || []);
     } catch (err) {
       setError('Failed to fetch items');
       console.error('Error:', err);
@@ -74,36 +75,47 @@ function App() {
     }
   };
 
-  const handleLogin = async (email, password) => {
-    try {
-      const response = await api.post('/users/login', { email, password });
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      setUser(user);
-      setIsAuthenticated(true);
-      return { success: true };
-    } catch (err) {
-      return { 
-        success: false, 
-        error: err.response?.data?.message || 'Login failed' 
-      };
-    }
-  };
-
   const handleRegister = async (name, email, password) => {
     try {
       const response = await api.post('/users/register', { name, email, password });
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      setUser(user);
-      setIsAuthenticated(true);
-      return { success: true };
+      if (response.data.success) {
+        // If your backend returns a token
+        if (response.data.token) {
+          localStorage.setItem('token', response.data.token);
+          api.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        }
+        setIsAuthenticated(true);
+        setUser(response.data.user);
+        setCurrentPage('home');
+        return { success: true };
+      }
+      return { success: false, error: 'Registration failed' };
     } catch (err) {
       return { 
         success: false, 
         error: err.response?.data?.message || 'Registration failed' 
+      };
+    }
+  };
+
+  const handleLogin = async (email, password) => {
+    try {
+      const response = await api.post('/users/login', { email, password });
+      if (response.data.success) {
+        if (response.data.token) {
+          localStorage.setItem('token', response.data.token);
+          api.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        }
+        setIsAuthenticated(true);
+        setUser(response.data.user);
+        setCurrentPage('home');
+        return { success: true };
+      }
+      return { success: false, error: 'Login failed' };
+    } catch (err) {
+      return { 
+        success: false, 
+        error: err.response?.data?.message || 'Login failed' 
       };
     }
   };
@@ -113,6 +125,7 @@ function App() {
     delete api.defaults.headers.common['Authorization'];
     setIsAuthenticated(false);
     setUser(null);
+    setCurrentPage('home');
   };
 
   if (loading) {
@@ -126,8 +139,8 @@ function App() {
           isAuthenticated={isAuthenticated} 
           user={user} 
           onLogout={handleLogout}
-          onLogin={handleLogin}
-          onRegister={handleRegister}
+          onNavigate={setCurrentPage}
+          currentPage={currentPage}
         />
         <div className="container">
           {error && <div className="alert alert-danger">{error}</div>}
@@ -136,14 +149,22 @@ function App() {
             <Route 
               path="/" 
               element={
-                <>
-                  <h1>Welcome to MERN on Azure</h1>
-                  <p>Your MERN stack application is successfully deployed on Microsoft Azure!</p>
-                  {isAuthenticated && <AddItem onAdd={addItem} />}
-                  <ItemList items={items} onDelete={deleteItem} isAuthenticated={isAuthenticated} />
-                </>
+                currentPage === 'home' ? (
+                  <>
+                    <h1>Welcome to MERN on Azure</h1>
+                    <p>Your MERN stack application is successfully deployed!</p>
+                    {isAuthenticated && <AddItem onAdd={addItem} />}
+                    <ItemList items={items} onDelete={deleteItem} isAuthenticated={isAuthenticated} />
+                  </>
+                ) : currentPage === 'register' ? (
+                  <Register onRegister={handleRegister} onNavigate={setCurrentPage} />
+                ) : currentPage === 'login' ? (
+                  <Login onLogin={handleLogin} onNavigate={setCurrentPage} />
+                ) : null
               } 
             />
+            <Route path="/register" element={<Register onRegister={handleRegister} onNavigate={setCurrentPage} />} />
+            <Route path="/login" element={<Login onLogin={handleLogin} onNavigate={setCurrentPage} />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>
