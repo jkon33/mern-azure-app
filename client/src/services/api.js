@@ -4,7 +4,7 @@ import axios from 'axios';
 const getBackendURL = () => {
   // Production (Vercel) - use your Render backend
   if (process.env.NODE_ENV === 'production') {
-    return 'https://your-app-backend.onrender.com/api'; // Will update after Render deploy
+    return 'https://mern-azure-app-wsvo.onrender.com/api'; // Will update after Render deploy
   }
   // Development (local)
   return 'http://localhost:5000/api';
